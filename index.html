@@ -1,0 +1,1071 @@
+<div id = "all">
+<div id = "first" style = "float: left">
+<div id = "score">
+	<span style = "width: 100px; color: #0a0; float: left"> </span>
+	<span style = "width: 100px; color: #a00; float: left"> </span>
+</div>
+<br>
+
+<canvas id = "canvas1" ></canvas>
+
+
+</div>
+
+<div id = "second" style = "float: left">
+
+<div id = "size_ts">
+	<span>Количество примеров в обучающей выборке</span>
+	<div id = "size_ts_div"> </div>
+</div>
+
+<div id="characteristics">
+	<label for = "inp1">Параметр скорости обучения</label>
+	<input type = "text" name = "h" id = "inp1" oninput = "change()" value = "1"/>
+	<hr color = "#ccc" />
+	<label for = "inp2">Максимальная итерация(!: меньше числа примеров в выборке)</label>
+	<input type = "text" name = "max_it" id = "inp2"  oninput = "change()" value = "0"/>
+	<hr color = "#ccc" />
+	<label for = "inp0">Начальная итерация</label>
+	<input type = "text" name = "max_it" id = "inp0"  oninput = "change()" value = "0"/>
+	<hr color = "#ccc" />
+	<label for = "inp3">Самоконтроль</label>
+	<input type = "checkbox" name = "t" id = "inp3" onchange = "change()" />
+	<hr color = "#ccc" />
+	<label for = "inp4">Онлайн обучение</label>
+	<input type = "checkbox" name = "t1" id = "inp4" onchange = "change()" checked/>
+	<hr color = "#ccc" />
+	<label for = "inp5">Сбор обучающей выборки</label>
+	<input type = "checkbox" name = "t2" id = "inp5" onchange = "change()" checked/>
+	<hr color = "#ccc" />
+	<label for = "inp6">Обучение на выборке</label>
+	<input type = "checkbox" name = "t3" id = "inp6" onchange = "change()" />
+	<hr color = "#ccc" />
+	<label for = "inp6">Обучение</label>
+	<progress max = "100" value = "0"></progress>
+	<div id = "progress" > </div>
+	
+	<div id = "butt1" onclick = "change()"> Применить параметры </div><br>
+	<div id = "butt2" onclick = "res_ts()"> Очистить обучающую выборку </div>
+	
+</div>
+
+</div>
+
+</div>
+
+<style>
+#second{
+width: 200px;
+margin-left: 10px;
+font-family: Comic Sans MS;
+}
+#size_ts span{
+color: #888;
+}
+#size_ts{
+margin-bottom: 10px;
+}
+#characteristics{
+color: #555;
+}
+#progress{
+color: #5a5;
+}
+#butt1{
+text-align: center;
+margin: 10px auto;
+width:180px;
+height: 30px;
+padding: 3px;
+background-color: #66b;
+color: #eee;
+cursor: pointer;
+transition: background-color 0.5s, box-shadow 0.1s;
+border-radius: 5px;
+box-shadow: 0 0 15px #000;
+}
+#butt1:hover{
+background-color: #88d;
+}
+#butt1:active{
+box-shadow: 0 0 0px #000;
+}
+
+#butt2{
+text-align: center;
+margin: 0px auto;
+width:180px;
+height: 40px;
+padding: 3px;
+background-color: #6b6;
+color: #eee;
+cursor: pointer;
+transition: background-color 0.5s, box-shadow 0.1s;
+border-radius: 5px;
+box-shadow: 0 0 15px #000;
+}
+#butt2:hover{
+background-color: #8d8;
+}
+#butt2:active{
+box-shadow: 0 0 0px #000;
+}
+</style>
+
+
+<script>
+Esize_ts = document.getElementById('size_ts_div');
+characteristics = document.getElementById('characteristics');
+progress = document.getElementsByTagName('progress')[0];
+function change(){
+
+	Ball.network.h = characteristics.children[1].value;
+	epoch = characteristics.children[4].value;
+	ksize_ts = characteristics.children[7].value;
+	t = characteristics.children[10].checked;
+	t1 = characteristics.children[13].checked;
+	t2 = characteristics.children[16].checked;
+	t3 = characteristics.children[19].checked;
+
+document.getElementById('progress').innerText = '';
+}
+
+function res_ts(){
+	train_samples = [];
+	Esize_ts.innerText = 0;
+	size_ts = 0;
+	ksize_ts = 0;
+}
+Esize_ts.innerText = 0;
+
+
+
+
+//---------------------------//
+function sigmoid(x){
+	
+	x = 1/(1 + Math.exp(-x));
+	return x;
+
+}
+
+
+
+train_samples = [];	//обучающая выборка
+size_ts = 0;	//количество примеров
+ksize_ts = 0;	//итерация
+epoch = 100;	//маскимально количество интрация
+t2 = true;		//создание выборки
+t3 = false;		//самообучение
+
+t = false;		//самоконтроль
+t1 = true;		//онлайн обучение
+
+cnt = 0;										//счетчик времени
+cnt_p = 40;	
+hh = 1;											//Время(cnt), через которое буду выполнятся итерации										
+score = document.getElementById('score').children;	//счет
+
+
+canvas = document.getElementById('canvas1');
+ctx = canvas.getContext('2d');
+canvas.setAttribute('width', '1000px');
+canvas.setAttribute('height', '500px');
+canvas.style.border = '1px solid #000';
+
+//create
+Apples = function(x = 0, y = 0, r = 25, x1 = 0, y1 = 0){
+
+	this.x = x;
+	this.y = y;
+	this.r = r;
+
+	this.v = {
+		x: x1,
+		y: y1
+	}
+	
+	this.facet = false
+
+}
+
+Bomb = function(x = 0, y = 0, r = 25, x1 = 0, y1 = 0){
+
+	this.x = x;
+	this.y = y;
+	this.r = r;
+
+	this.v = {
+		x: x1,
+		y: y1
+	}
+	
+	this.del = false;
+	this.facet = false
+
+}
+
+
+Ball = {
+
+	x: 500,
+	y: 250,
+	r: 25,
+	score_g: 0,
+	score_r: 0,
+	v: {
+		x:0,
+		y:0
+	},
+	
+	scaners: {								//сканеры
+		
+		length: 1000,
+		
+		i: [],								//значения на сканерах
+		
+		get_data: function(){				//Ball.scaners.get_data / Получение данных со сканеров
+		
+
+		var angl = 0;
+		var x0 = Ball.x,
+			y0 = Ball.y;
+		
+		var l = Ball.scaners.length;
+		
+			for(let k = 0; k < 32; k++){
+			
+			x1 = l*Math.cos(angl),
+			y1 = l*Math.sin(angl);
+			
+			Ball.scaners.i[k] = 0;
+
+			
+				for(i = 0; i < bombs.length; i++){
+				
+				if(((k >= 0) && (k <= 8) && (bombs[i].x < x0) && (bombs[i].y < y0)) || ((k >= 8) && (k <= 16) && (bombs[i].x > x0) && (bombs[i].y < y0)) || ((k >= 16) && (k <= 24) && (bombs[i].x > x0) && (bombs[i].y > y0)) || ((k >= 24) && (k <= 32) && (bombs[i].x < x0) && (bombs[i].y > y0))){			//Проверка областей видимости сканеров
+				
+				
+			
+					var x2 = bombs[i].x,
+						y2 = bombs[i].y;
+					
+					var p = true;		//проверка на наличие решения
+					var pt = true;		//проверка на наличие ДВУХ корней
+					var t1, t2;
+					
+					
+					var a = x1*x1 + y1*y1,
+						b = 2*(x1*(x0 - x2) + y1*(y0 - y2)),
+						c = (x0 - x2)*(x0 - x2) + (y0 - y2)*(y0 - y2) - bombs[i].r*bombs[i].r;
+					
+					
+					//------------------------------Проверка восьми возможных случаев
+					if((a == 0) && (b != 0)){
+						t = -c/b;
+						pt = false;
+					}
+					
+					if((a == 0) && (b == 0)){
+						p = false;
+					}
+					
+					if((a != 0) && (b != 0) && (c == 0)){
+						t1 = 0;
+						t2 = b/a;
+					}
+					
+					if((a != 0) && (b == 0) && (c == 0)){
+						t1 = 0;
+						pt = false;
+					}
+					
+					if((a != 0) && (b == 0) && (c != 0)){
+						t1 = Math.sqrt(c/a);
+						t2 = -Math.sqrt(c/a);
+					}
+					
+					if((a != 0) && (b != 0) && (c != 0)){
+						
+						var d = b*b - 4*a*c;
+						
+						if(d > 0){
+							
+							t1 = (-b + Math.sqrt(d))/(2*a);
+							t2 = (-b - Math.sqrt(d))/(2*a);
+							
+						}
+						
+						if(d == 0){
+							t1 = -b/(2*a);
+						}
+						
+						if(d < 0){
+							p = false;
+						}
+						
+					}
+					
+					//-----------------------------------
+					
+					if(p == true){
+					
+						if(pt == true){
+
+							let x = t1*x1 + x0;
+							let y = t1*y1 + y0;
+							let l1 = Math.pow((x - Ball.x), 2)+Math.pow((y - Ball.y), 2);
+						
+							x = t2*x1 + x0;
+							y = t2*y1 + y0;
+							
+							let l2 = Math.pow((x - Ball.x), 2)+Math.pow((y - Ball.y), 2);
+							
+							if(l1 <= l2){
+
+								Ball.scaners.i[k] += 1 - l1/(l*l);
+							}else{
+
+								Ball.scaners.i[k] += 1 - l2/(l*l);
+							}
+						
+						}else{
+						
+							let x = t1*x1 + x0;
+							let y = t1*y1 + y0;
+							
+							Ball.scaners.i[k] += 1 - (Math.pow((x - Ball.x), 2)+Math.pow((y - Ball.y), 2))/(l*l);
+						
+						}
+					
+					}else{
+					
+						Ball.scaners.i[k] += 0;
+						
+					}
+					
+
+				
+				}else{
+					continue;
+				}
+				
+				}
+				
+				angl += Math.PI/16;
+				
+			}
+		
+		
+		//!---------------Для зелёных
+		for(k = 32; k < 64; k++){
+			
+			x1 = l*Math.cos(angl),
+			y1 = l*Math.sin(angl);
+			
+			Ball.scaners.i[k] = 0;
+
+			
+				for(i = 0; i < apples.length; i++){
+				
+				if(((k >= 32) && (k <= 40) && (apples[i].x < x0) && (apples[i].y < y0)) || ((k >= 40) && (k <= 48) && (apples[i].x > x0) && (apples[i].y < y0)) || ((k >= 48) && (k <= 56) && (apples[i].x > x0) && (apples[i].y > y0)) || ((k >= 56) && (k <= 64) && (apples[i].x < x0) && (apples[i].y > y0))){
+				
+				
+			
+					var x2 = apples[i].x,
+						y2 = apples[i].y;
+					
+					var p = true;		//проверка на наличие решения
+					var pt = true;		//проверка на наличие ДВУХ корней
+					var t1, t2;
+					
+					
+					var a = x1*x1 + y1*y1,
+						b = 2*(x1*(x0 - x2) + y1*(y0 - y2)),
+						c = (x0 - x2)*(x0 - x2) + (y0 - y2)*(y0 - y2) - apples[i].r*apples[i].r;
+					
+					
+					//------------------------------Проверка восьми возможных случаев
+					if((a == 0) && (b != 0)){
+						t = -c/b;
+						pt = false;
+					}
+					
+					if((a == 0) && (b == 0)){
+						p = false;
+					}
+					
+					if((a != 0) && (b != 0) && (c == 0)){
+						t1 = 0;
+						t2 = b/a;
+					}
+					
+					if((a != 0) && (b == 0) && (c == 0)){
+						t1 = 0;
+						pt = false;
+					}
+					
+					if((a != 0) && (b == 0) && (c != 0)){
+						t1 = Math.sqrt(c/a);
+						t2 = -Math.sqrt(c/a);
+					}
+					
+					if((a != 0) && (b != 0) && (c != 0)){
+						
+						var d = b*b - 4*a*c;
+						
+						if(d > 0){
+							
+							t1 = (-b + Math.sqrt(d))/(2*a);
+							t2 = (-b - Math.sqrt(d))/(2*a);
+							
+						}
+						
+						if(d == 0){
+							t1 = -b/(2*a);
+						}
+						
+						if(d < 0){
+							p = false;
+						}
+						
+					}
+					
+					//-----------------------------------
+					
+					if(p == true){
+					
+						if(pt == true){
+
+							let x = t1*x1 + x0;
+							let y = t1*y1 + y0;
+							let l1 = Math.pow((x - Ball.x), 2)+Math.pow((y - Ball.y), 2);
+						
+							x = t2*x1 + x0;
+							y = t2*y1 + y0;
+							
+							let l2 = Math.pow((x - Ball.x), 2)+Math.pow((y - Ball.y), 2);
+							
+							if(l1 <= l2){
+
+								Ball.scaners.i[k] += 1 - l1/(l*l);
+							}else{
+
+								Ball.scaners.i[k] += 1 - l2/(l*l);
+							}
+						
+						}else{
+						
+							let x = t1*x1 + x0;
+							let y = t1*y1 + y0;
+							
+							Ball.scaners.i[k] += 1 - (Math.pow((x - Ball.x), 2)+Math.pow((y - Ball.y), 2))/(l*l);
+						
+						}
+					
+					}else{
+					
+						Ball.scaners.i[k] += 0;
+						
+					}
+					
+
+				
+				}else{
+					continue;
+				}
+				
+				}
+				
+				angl += Math.PI/16;
+				
+			}
+			
+			
+			
+		Ball.scaners.i[64] = (1000 - Ball.x) / 1000;			//левая граница
+		Ball.scaners.i[65] = Ball.x / 1000;						//правая граница
+		Ball.scaners.i[66] = (500 - Ball.y) / 500;				//верхняя граница
+		Ball.scaners.i[67] = Ball.y / 500;						//нижняя граница
+		
+		}
+
+		
+	},
+	
+	network: {				//Нейронная сеть
+	
+	//входные значения находятся на сенсорах
+	
+	hidden: [],				//Скрытый слой, 8 нейронов
+	
+	W: [],					//Веса входных нейронов, 8x68
+	
+	V: [],					//Веса скрытых нейронов, 4x8
+	
+	Y: [],					//Выходные нейроны, 4
+	
+	h: 1,					//параметр корректировки скорости обучения, сама скорость равна дельте
+	
+	B: 0,					//Сдвиговый нейрон для выходного слоя
+	
+	init: function(){		//Инициализация весов случайными числами от -1 до 1
+		
+		var W = Ball.network.W;
+		var V = Ball.network.V;
+		
+		for(let i = 0; i < 8; i++){		
+		
+		W[i] = [];
+		
+		if(i < 4) V[i] = [];
+		
+			for(let j = 0; j < 68; j++){
+			
+			W[i][j] = Math.random()*Math.pow((-1), Math.round(Math.random()*2));
+			
+			if((i < 4) && (j < 8)) V[i][j] = Math.random()*Math.pow((-1), Math.round(Math.random()*2));
+			
+			}
+		
+		}
+		
+	},
+	
+	
+	go: function(){			//Запуск
+	
+		var inp = Ball.scaners.i;			//Получаем значения со сканеров
+		var hidden = Ball.network.hidden;
+		var Y = Ball.network.Y;
+		var W = Ball.network.W;
+		var V = Ball.network.V;
+		var B = Ball.network.B;
+		
+		for(let i = 0; i < 8; i++){			//заполняем скрытый слой
+		
+		hidden[i] = 0;
+		
+			for(let j = 0; j < 68; j++){
+			
+				hidden[i] += inp[j]*W[i][j];
+			
+			}
+		
+		hidden[i] = sigmoid(hidden[i]);
+		
+		}
+		
+		for(let i = 0; i < 4; i++){			//Заполняем выходной слой
+		
+		Y[i] = 0;
+		
+			for(let j = 0; j < 8; j++){
+			
+				Y[i] += hidden[j]*V[i][j];
+			
+			}
+			
+		Y[i] = sigmoid(Y[i] + B);
+		
+		}
+		
+		if(t){								//Проверка на самоконтроль сети и (if 1) формирование вызодных значений
+			
+				
+			if(Y[0]>Y[1]){
+				
+				Ball.v.x = -7*Y[0];
+				
+			}else{
+					
+				Ball.v.x = 7*Y[1];
+					
+			}
+
+			if(Y[2]>Y[3]){
+			
+				Ball.v.y = -7*Y[2];
+			
+			}else{
+			
+				Ball.v.y = 7*Y[3];
+			
+			}
+		
+		}
+	
+	},
+	
+	train: function(){					//Обучение
+	
+	var h = Ball.network.h
+	
+	
+	if(t3){								//Проверка на самообучение по примерам
+		var inp = train_samples[ksize_ts];
+		OUTPUT = inp.slice(68, 72);
+		progress.setAttribute('max', epoch);
+		progress.setAttribute('value', ksize_ts);
+		if(ksize_ts == epoch){
+			document.getElementById('progress').innerText = 'Обучение на данной выборке завершено';
+			characteristics.children[19].checked = false;
+			t3 = 0;
+		}
+	}else{								//Иначе значения берутся со сканеров
+		var inp = Ball.scaners.i;
+	}
+	
+	var hidden = Ball.network.hidden;
+	var Y = Ball.network.Y;
+	var W = Ball.network.W;
+	var V = Ball.network.V;
+
+	
+	var d1 = [];						//Дельты скрытого слоя
+	var d2 = [];						//Дельты входного слоя
+	
+	//var error =  0;					//общая ошибка
+	
+	d1[0] = Y[0] - OUTPUT[0];
+	d1[1] = Y[1] - OUTPUT[1];
+	d1[2] = Y[2] - OUTPUT[2];
+	d1[3] = Y[3] - OUTPUT[3];
+	
+	var offset = 0;
+	var offsets = [];
+		
+	var h1 = 0;							//Cкорость обучения
+		
+	for(let i = 0; i < 4; i++){	
+	
+			for(let j = 0; j < 8; j++){
+	
+
+			offset = d1[i]*(Y[i]*(1 - Y[i]))*hidden[j];	
+			
+			h1 = Math.abs(d1[i])*0.1*h;		//Инициализация скорости обучения (чем меньше дельта, тем меньше скорость)
+			
+			V[i][j] = V[i][j] - h1*offset;
+			
+		}
+	
+	}
+	
+	d2 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+	
+	
+	for(let j = 0; j < 8; j++){					//Подсчет дельт для скрытого слоя
+		
+		for(let k = 0; k < 4; k++){
+			
+			d2[j] += d1[k]*(Y[k]*(1 - Y[k]))*V[k][j];
+			
+		}
+	}
+		
+	
+	
+	for(let i = 0; i < 8; i++){
+		
+		offsets[i] = [];
+		
+			for(let j = 0; j < 68; j++){
+				
+				h1 = Math.abs(d2[i])*0.1*h;
+				
+				offsets[i][j] = d2[i]*hidden[i]*(1.01 - hidden[i])*inp[j];
+				W[i][j] = W[i][j] - h1*offsets[i][j];
+				
+			}
+	}
+	
+	}
+	
+	
+	}
+	
+
+}
+
+
+//Инициализация массива вызодов (лево право верх низ)
+OUTPUT = [0, 0, 0, 0];
+
+//Первичная инициализация весов случайными числами
+Ball.network.init();
+
+
+
+
+
+
+
+
+
+
+
+
+//-----------------------------------------------Релизация игры-------------------------------------------------//
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+bombs = [];
+apples = [];
+
+function createO(){					//Создание объектов
+
+	var r = Math.round(Math.random()*50 + 25);
+	var x, y;
+	
+	var x0, y0;
+	var t;
+	
+	x0 = Math.round(Math.random());
+	
+	switch(x0){
+		case 0: 
+			x0 = -2*r; 
+			t = 1;
+			y0 = 0;
+		break;
+		case 1: 
+			x0 = 1000+2*r; 
+			t = -1;
+			y0 = 100;
+		break;
+	}
+	
+	x = Math.random()*(0.5)*t+0.5;
+	y = Math.random()*(0.2);
+	bombs.push(new Bomb(x0, y0, r, x*5, y*5));
+	
+	r = Math.round(Math.random()*50 + 25)
+	x0 = Math.round(Math.random());
+	y0 = 250;
+	switch(x0){
+		case 0: 
+			x0 = -2*r; 
+			t = 1;
+			y0 = 250;
+		break;
+		case 1: 
+			x0 = 1000+2*r; 
+			t = -1;
+				y0 = 500;
+		break;
+	}
+	
+
+	x = Math.random()*(0.5)*t+0.5;
+	y = Math.random()*(0.1);
+	bombs.push(new Bomb(x0, y0, r, x*5, y*5));
+	r = Math.round(Math.random()*30 + 25)
+	switch(x0){
+		case 0: 
+			x0 = -2*r; 
+			t = 1;
+		break;
+		case 1: 
+			x0 = 1000+2*r; 
+			t = -1;
+		break;
+	}
+	
+	
+	y0 = Math.random()*500 + r;
+	x = Math.random()*(0.5)*t+0.5;
+	y = Math.random()*(0.1);
+	apples.push(new Apples(x0, y0, r, x*5, y*5));
+
+}
+
+function draw(){				//Отрисовка объектов
+
+	ctx.clearRect(0, 0, 1000, 500);
+
+	for(let i = 0; i < bombs.length; i++){
+	
+		if(bombs[i].gel == true) continue;
+		
+		ctx.beginPath();
+		ctx.strokeStyle = '#ff0000';
+		ctx.arc(bombs[i].x, bombs[i].y, bombs[i].r, 0, 2*Math.PI, true);
+		ctx.stroke();
+		ctx.closePath();
+	}
+	
+	for(let j = 0; j < apples.length; j++){
+		ctx.beginPath();
+		ctx.strokeStyle = '#00ff00';
+		ctx.arc(apples[j].x, apples[j].y, apples[j].r, 0, 2*Math.PI, true);
+		ctx.stroke();
+		ctx.closePath()
+	}
+		ctx.beginPath();
+		ctx.strokeStyle = '#ffa500';
+		ctx.fillStyle = '#ffa500';
+		ctx.arc(Ball.x, Ball.y, Ball.r, 0, 2*Math.PI, true);
+		ctx.fill();
+		ctx.closePath()
+}
+
+
+
+function moment(){									//Функция, рабоающая в момент времени
+
+	for(let i = 0; i < bombs.length; i++){			//Передвижение красных
+			if(bombs[i].gel == true) continue;
+			if((bombs[i].x < 950) && (bombs[i].x > 0)) bombs[i].facet = true;
+			if((bombs[i].x > 950) && (bombs[i].x < 1000)) bombs[i].facet = true;
+
+		bombs[i].x += bombs[i].v.x;
+		bombs[i].y += bombs[i].v.y;
+		
+		
+			//---------------
+			if(Math.sqrt(Math.pow((bombs[i].x - Ball.x), 2) + Math.pow((bombs[i].y - Ball.y), 2)) < (bombs[i].r + Ball.r)){
+				Ball.score_r += 1;
+				bombs.splice(i, 1);
+				score[1].innerHTML = Ball.score_r;
+				continue;
+			}
+			//----------------
+			
+		if((bombs[i].x < -2*bombs[i].r - 20) || (bombs[i].x > 1000 + 2*bombs[i].r + 20)||(bombs[i].y < -2*bombs[i].r - 20) || (bombs[i].y > 500 + 2*bombs[i].r + 20)) bombs.splice(i, 1);
+		
+
+		
+	}
+	
+	for(let j = 0; j < apples.length; j++){			//Передвижение зелёных
+		apples[j].x += apples[j].v.x;
+		apples[j].y += apples[j].v.y;
+		if((apples[j].x + apples[j].r < 950) && (apples[j].x - apples[j].r > 0)) apples[j].facet = true;
+		if((apples[j].x> 950 - apples[j].r) && (apples[j].x < 1000 + apples[j].r)) apples[j].facet = true;
+		
+		//---------------
+		if(Math.sqrt(Math.pow((apples[j].x - Ball.x), 2) + Math.pow((apples[j].y - Ball.y), 2)) < (apples[j].r + Ball.r)){
+			Ball.score_g += 1;
+			apples.splice(j, 1);
+			score[0].innerHTML = Ball.score_g;
+			continue;
+		}
+		//----------------
+		
+		
+		if((apples[j].x < -2*apples[j].r - 20) || (apples[j].x > 1000 + 2*apples[j].r + 20)||(apples[j].y < -2*apples[j].r - 20) || (apples[j].y > 500 + 2*apples[j].r + 20)) apples.splice(j, 1);
+		
+				
+
+	}
+	
+	for(let i = 0; i < bombs.length-1; i++){		//Столкновение красных друг с другом
+			if(bombs[i].gel == true) continue;
+			if(bombs[i].facet == false) continue;
+	
+			
+		for(let j = i+1; j < bombs.length; j++){
+		
+		if(bombs[j].facet == false) continue;
+		
+
+		if(Math.sqrt(Math.pow((bombs[i].x - bombs[j].x), 2) + Math.pow((bombs[i].y - bombs[j].y), 2)) < (bombs[i].r + bombs[j].r)){
+		
+			if(bombs[i].r >= bombs[j].r){
+				bombs[i].v.x -= bombs[j].v.x;
+				bombs[j].v.x += bombs[i].v.x;
+				bombs[i].v.y -= bombs[j].v.y;
+				bombs[j].v.y += bombs[i].v.y;
+			}else{
+				bombs[j].v.x -= bombs[i].v.x;
+				bombs[i].v.x += bombs[j].v.x;
+				bombs[j].v.y -= bombs[i].v.y;
+				bombs[i].v.y += bombs[j].v.y;	
+			}
+		
+		}
+		
+		}
+	}	
+	
+	for(let i = 0; i < apples.length-1; i++){			//Столкновение зелёных друг с другом
+		if(apples[i].gel == true) continue;
+		if(apples[i].facet == false){
+			continue;
+		}else{
+			if((apples[i].x - apples[i].r <=0) || (apples[i].x >= 1000 - apples[i].r)){
+				apples[i].v.x *= -0.7;
+			}
+			if((apples[i].y - apples[i].r<=0) || (apples[i].y >= 500 - apples[i].r)){
+				apples[i].v.y *= -0.7;
+			}		
+		}
+
+
+		for(let j = i+1; j < apples.length; j++){
+
+		if(apples[j].facet == false){
+			continue; 
+		}else{
+
+		}
+		
+
+		
+		if(Math.sqrt(Math.pow((apples[i].x - apples[j].x), 2) + Math.pow((apples[i].y - apples[j].y), 2)) < (apples[i].r + apples[j].r)){
+		
+			if(apples[i].r >= apples[j].r){
+				apples[i].v.x -= apples[j].v.x;
+				apples[j].v.x += apples[i].v.x;
+				apples[i].v.y -= apples[j].v.y;
+				apples[j].v.y += apples[i].v.y;
+			}else{
+				apples[j].v.x -= apples[i].v.x;
+				apples[i].v.x += apples[j].v.x;
+				apples[j].v.y -= apples[i].v.y;
+				apples[i].v.y += apples[j].v.y;
+			}
+		
+		}
+		
+		}
+		
+		
+	
+		
+	}	
+	
+	if((Ball.x <= 1000 - Ball.r) && (Ball.x >= 0 + Ball.r)){
+		Ball.x += Ball.v.x;
+	}else{
+		
+		if(Ball.x > 1000 - Ball.r){
+			Ball.x -= Ball.r/2;
+		}
+		
+		if(Ball.x < 0 + Ball.r){
+			Ball.x += Ball.r/2;
+		}
+	
+	}
+	
+	if((Ball.y <= 500 - Ball.r) && (Ball.y >= 0 + Ball.r)){
+		Ball.y += Ball.v.y;
+	}else{
+	
+		if(Ball.y > 500 - Ball.r){
+			Ball.y -= Ball.r/2;
+		}
+		
+		if(Ball.y < 0 + Ball.r){
+			Ball.y += Ball.r/2;
+		}
+	
+	}
+	
+}
+
+createO();
+
+function doing(){
+	
+	if(cnt == cnt_p){
+		createO();
+		cnt = 0;
+	}
+	
+	if(cnt%20 == 0){
+		
+		Ball.scaners.get_data();
+		
+	}
+	
+
+	if(t){
+		Ball.network.go();
+	}
+	
+	if(t3 && (cnt%hh == 0) && (ksize_ts <= epoch)){
+		Ball.network.train();
+		ksize_ts++;
+	}
+	
+	moment();
+	draw();
+	cnt++;
+}
+
+function ev(e){					//Событие по нажатии клаыиши
+
+switch(e.keyCode){
+
+	case 87:
+		Ball.v.y = -5;
+		OUTPUT = [0, 0, 1, 0];
+		
+
+	break;
+	case 65:
+		Ball.v.x = -5;
+		OUTPUT = [1, 0, 0, 0];
+		
+
+	break;
+	case 68:
+		Ball.v.x = 5;
+		OUTPUT = [0, 1, 0, 0];
+		
+
+	break;
+	case 83:
+		Ball.v.y = 5;
+		OUTPUT = [0, 0, 0, 1];
+		
+
+	break;
+	
+	default: return; break;
+
+	}
+	
+	if(t1 && !t){
+		Ball.network.go();
+		Ball.network.train();
+	}
+	
+	if(t2 && (cnt%20 >= 0) && (cnt%20 <= 30)){
+		Ball.network.go();
+		train_samples[size_ts] = Ball.scaners.i.concat(OUTPUT);
+		size_ts++;
+		Esize_ts.innerText = size_ts;
+	}else{
+		size_ts = 0;
+	}
+	
+}
+
+function up(){
+	Ball.v.x = 0;
+	Ball.v.y = 0;
+}
+
+
+addEventListener('keydown', ev, false);
+addEventListener('keyup', up, false);
+
+setInterval(doing, 25); 					//Запуск цикла
+
+</script>
